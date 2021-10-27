@@ -1,0 +1,69 @@
+# Question 1: What is the mean expression across all features for sample 5 in the ALL dataset (from the ALL package)?
+library(ALL)
+data(ALL)
+dat <- exprs(ALL)[,5]
+mean(dat)
+
+
+# We will use the biomaRt package to annotate an Affymetrix microarray. We want our results in the hg19 build of the human genome and we therefore need to connect to Ensembl 75 which is the latest release on this genome version. How to connect to older versions of Ensembl is described in the biomaRt package vignette
+# Using this version of Ensembl, annotate each feature of the ALL dataset with the Ensembl gene id. 
+# Question 2: How many probesets (features) are annotated with more than one Ensembl gene id?
+library(biomaRt)
+mart <- useMart(host="feb2014.archive.ensembl.org", biomart = "ENSEMBL_MART_ENSEMBL")
+ensembl <- useDataset("hsapiens_gene_ensembl", mart)
+values <- names(dat)
+query <- getBM(attributes = c("ensembl_gene_id", "affy_hg_u95av2"), filters = c("affy_hg_u95av2"), values = values, mart = ensembl)
+length(query$affy_hg_u95av2) - length(unique(query$affy_hg_u95av2))
+
+
+# Question 3: How many probesets (Affymetrix IDs) are annotated with one or more genes on the autosomes (chromosomes 1 to 22).
+autosomes <- c('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '21', '22')
+query <- getBM(attributes = c("ensembl_gene_id", "affy_hg_u95av2"), filters = c("affy_hg_u95av2", "chromosome_name"), values = list(affyid = values, chromosome = autosomes),mart = ensembl)
+length(unique(query$affy_hg_u95av2))
+
+
+# Use the MsetEx dataset from the minfiData package.
+# Question 4: What is the mean value of the Methylation channel across the features for sample “5723646052_R04C01”?
+library(minfiData)
+dat <- minfiData::MsetEx
+dat <- assay(dat)
+mean(dat[, "5723646052_R04C01"])
+
+
+# Question 5: Access the processed data from NCBI GEO Accession number GSE788. What is the mean expression level of sample GSM9024?
+library(GEOquery)
+elist <- getGEO("GSE788")
+eData <- elist[[1]]
+eData <- exprs(eData)
+mean(eData[,"GSM9024"])
+
+
+# We are using the airway dataset from the airway package.
+# Question 6: What is the average of the average length across the samples in the experiment?
+library(airway)
+data(airway)
+mean(airway$avgLength)
+
+
+# Question 7: What is the number of Ensembl genes which have a count of 1 read or more in sample SRR1039512?
+dat <- assay(airway, "counts")
+sum(dat[, "SRR1039512"] >= 1)
+
+
+# The airway dataset contains more than 64k features. 
+# Question 8: How many of these features overlaps with transcripts on the autosomes (chromosomes 1-22) as represented by the TxDb.Hsapiens.UCSC.hg19.knownGene package?
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txExons = exons(TxDb.Hsapiens.UCSC.hg19.knownGene)
+seqlevels(txExons, pruning.mode="coarse") = paste("chr",1:22,sep="")
+
+gr <- rowRanges(airway)
+seqlevelsStyle(gr) <- "UCSC"
+
+ov <- subsetByOverlaps(gr, txExons)
+length(ov)
+
+
+# Question 9: For sample SRR1039508, how big a percentage (expressed as a number between 0 and 1) of the total reads in the airway dataset for that sample, are part of a feature which overlaps an autosomal TxDb.Hsapiens.UCSC.hg19.knownGene transcript?
+total_cnt <- sum(dat[, "SRR1039508"])  ##Total count of reads from sample
+ov_cnt <- sum(dat[names(ov), "SRR1039508"])  ##Count of reads that overlap with known autosomal transcripts
+ov_cnt/total_cnt  ##Percentage of reads
