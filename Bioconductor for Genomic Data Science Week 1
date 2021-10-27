@@ -1,0 +1,62 @@
+library(AnnotationHub)
+ah = AnnotationHub()
+ah = subset(ah, species == "Homo sapiens")
+
+# Use the AnnotationHub package to obtain data on "CpG Islands" in the human genome.
+# Question: How many islands exists on the autosomes?
+cpg = query(ah, c("CpG Islands"))
+cpg1 = cpg[[1]]
+autosomes = c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22")
+cpg1 = keepSeqlevels(cpg1, autosomes, pruning.mode = "coarse")
+length(cpg1)
+
+
+# Question: How many CpG Islands exists on chromosome 4?
+seqnames(cpg1) == "chr4"
+
+
+# Obtain the data for the H3K4me3 histone modification for the H1 cell line from Epigenomics Roadmap, using AnnotationHub. Subset these regions to only keep regions mapped to the autosomes (chromosomes 1 to 22).
+# Question: How many bases does these regions cover?
+h3k4 = query(ah, c("H3K4me3", "H1", "E003"))
+h3k4 = h3k4[["AH29884"]]
+h3k4 = keepSeqlevels(h3k4, autosomes, pruning.mode = "coarse")
+sum(width(h3k4))
+
+
+# Obtain the data for the H3K27me3 histone modification for the H1 cell line from Epigenomics Roadmap, using the AnnotationHub package. Subset these regions to only keep regions mapped to the autosomes. In the return data, each region has an associated "signalValue".
+# Question: What is the mean signalValue across all regions on the standard chromosomes?
+h3k27 = query(ah, c("H3K27me3", "H1", "E003"))
+h3k27 = h3k27[["AH29892"]]
+h3k27 = keepSeqlevels(h3k27, autosomes, pruning.mode = "coarse")
+mean(h3k27@elementMetadata@listData$signalValue)
+
+
+# Bivalent regions are bound by both H3K4me3 and H3K27me3.
+# Question: Using the regions we have obtained above, how many bases on the standard chromosomes are bivalently marked?
+sum(width(intersect(h3k4, h3k27, ignore.strand = TRUE)))
+
+
+# We will examine the extent to which bivalent regions overlap CpG Islands.
+# Question: how big a fraction (expressed as a number between 0 and 1) of the bivalent regions, overlap one or more CpG Islands?
+bv = intersect(h3k4, h3k27)
+ov = intersect(bv, cpg1)
+width(intersect(bv, cpg1, ignore.strand = TRUE))
+length(ov)/length(cpg1)
+
+
+#Question: How big a fraction (expressed as a number between 0 and 1) of the human genome is contained in a CpG Island?
+sum(width(cpg1))/sum(seqlengths(cpg1))
+
+
+# Question: Compute an odds-ratio for the overlap of bivalent marks with CpG islands.
+inOut = matrix(0, nrow = 2, ncol = 2)
+colnames(inOut) = c("in", "out")
+rownames(inOut) = c("in", "out")
+
+inOut[1,1] = sum(width(intersect(bv, cpg1, ignore.strand = TRUE)))
+inOut[1,2] = sum(width(setdiff(bv, cpg1, ignore.strand = TRUE)))
+inOut[2,1] = sum(width(setdiff(cpg1, bv, ignore.strand = TRUE)))
+inOut[2,2] = 3*10^9 - sum(inOut)
+odds_ratio = inOut[1,1] * inOut[2,2]/(inOut[1,2] * inOut[2,1])
+odds_ratio
+sum(inOut)
